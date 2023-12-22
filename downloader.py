@@ -4,30 +4,36 @@ import os
 import time
 import getpass
 import _thread
+import re
 from tqdm import tqdm
-from selenium import webdriver
+from seleniumwire import webdriver
+from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 
+
 REDOWNLOAD = False
 # BASEPATH = os.getcwd() + "\\content"
-BASEPATH = r"M:\Serien\Aloyoga"
+# BASEPATH = r"M:\Serien\Aloyoga"
 
 socket.setdefaulttimeout(10)
-email = input('Enter Email:')
-password = getpass.getpass(prompt='Enter Password:')
+# email = input('Enter Email:')
+email = 'torch77@gmail.com'
+# password = getpass.getpass(prompt='Enter Password:')
+password = '6!&5kilSW!i9#PApktb@'
 options = Options()
-options.add_argument('--headless')
+# options.add_argument('--headless')
 options.add_argument('--disable-gpu')
 options.add_argument('--log-level=3')
 browser = webdriver.Chrome(options=options)
+# browser = webdriver.Chrome()
 paths = []
 lines = []
 LINKFILE = ""
 BASEPATH = ""
 SYSTEM = os.name
 
-
+#6!&5kilSW!i9#PApktb@
 if SYSTEM == "nt":
     LINKFILE = os.getcwd() + "\\downloadlinks.txt"
     with open(LINKFILE) as f:
@@ -48,6 +54,7 @@ elif SYSTEM == "posix":
 else:
     print("OS not supported, please open an issue on Github.")
 
+print(paths)
 
 class DownloadProgressBar(tqdm):
     def update_to(self, b=1, bsize=1, tsize=None):
@@ -64,30 +71,30 @@ def downloadmp4(url, filename, path, counterepisode, counterseason):
         return True
     else:
         print("Downloading: " + filename)
-        with DownloadProgressBar(unit='B', unit_scale=True,
-                                 miniters=1, desc=url.split('/')[-1]) as t:
+        # with DownloadProgressBar(unit='B', unit_scale=True,
+                                #  miniters=1, desc=url.split('/')[-1]) as t:
+        try:
+            urllib.request.urlretrieve(
+                url, filename=fullname, reporthook=t.update_to)
+            return True
+        except:
+            print("Request timed out!")
             try:
-                urllib.request.urlretrieve(
-                    url, filename=fullname, reporthook=t.update_to)
-                return True
+                os.remove(fullname)
             except:
-                print("Request timed out!")
-                try:
-                    os.remove(fullname)
-                except:
-                    print("No file created!")
-                    return False
+                print("No file created!")
                 return False
+            return False
 
 
 def doLogin(email, password):
     browser.get(
         "https://www.alomoves.com/signin")
     time.sleep(5)
-    mailfield = browser.find_elements_by_xpath(
-        "//input[contains(@name,'email')]")[1]
-    pwfield = browser.find_elements_by_xpath(
-        "//input[contains(@name,'password')]")[2]
+    mailfield = browser.find_element("xpath",
+        "//input[contains(@name,'email')]")
+    pwfield = browser.find_element("xpath",
+        "//input[contains(@name,'password')]")
     mailfield.send_keys(email)
     mailfield.send_keys(Keys.TAB)
     time.sleep(1)
@@ -100,7 +107,7 @@ def collectClasses(courselink):
     time.sleep(5)
     browser.get(courselink)
     time.sleep(5)
-    workoutLinks = browser.find_elements_by_xpath(
+    workoutLinks = browser.find_elements("xpath",
         "//div[contains(@class,'workout-title')]/a")
     reallinks = [link.get_attribute("href") for link in workoutLinks]
     if(len(reallinks) == 0):
@@ -112,12 +119,14 @@ def collectClasses(courselink):
 
 def grabLesson(lessonlink, path):
     browser.get(lessonlink)
-    time.sleep(2)
+    # time.sleep(2)
     try:
-        videolink = browser.find_element_by_tag_name(
-            "video").get_attribute("currentSrc")
-        videotitle = browser.find_element_by_tag_name(
-            "h1").get_attribute("innerText").replace(":", "").replace(" ", "_").replace("/", "")
+        # videolink = browser.find_element("tag name",
+            # "video").get_attribute("currentSrc")
+        videolink = browser.wait_for_request('m3u8').url
+        # videotitle = browser.find_element("tag name",
+            # "h1").get_attribute("innerText").replace(":", "").replace(" ", "_").replace("/", "")
+        videotitle = browser.find_element(By.CLASS_NAME, "workoutTitle").text
     except:
         print("Page loading failed! Retrying...")
         return False
@@ -185,3 +194,9 @@ def main():
 
 
 main()
+
+
+### to do 
+### don't download all videos for each class if it is repeated 
+### get list of m3u8 playlists
+### convert either by some python binding to ffmpeg or just use process to call it
