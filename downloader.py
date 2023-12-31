@@ -10,6 +10,7 @@ from seleniumwire import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
+import ffmpeg
 
 
 REDOWNLOAD = False
@@ -56,6 +57,7 @@ else:
 
 print(paths)
 
+
 class DownloadProgressBar(tqdm):
     def update_to(self, b=1, bsize=1, tsize=None):
         if tsize is not None:
@@ -85,7 +87,32 @@ def downloadmp4(url, filename, path, counterepisode, counterseason):
                 print("No file created!")
                 return False
             return False
+        
 
+def downloadm3u8_as_mkv(url, filename, path, counterepisode, counterseason):
+    fullname = path + f"s{str(counterseason+1).zfill(2)}" + f"e{str(counterepisode+1).zfill(2)}_" + filename + ".mkv"
+    fullname = fullname.lower()
+    if os.path.isfile(fullname):
+        print(filename + " already exists, skipping...")
+        return True
+    else:
+        print("Downloading: " + filename)
+        print(url)
+        try:
+            ffmpeg.input(url).output(fullname).global_args('-progress', 'pipe:1').run(capture_stdout=True, capture_stderr=True)
+            return True
+        except ffmpeg.Error as e:
+            print('stdout:', e.stdout)
+            print('stderr:', e.stderr)
+            raise e
+        except:
+            print("Request timed out!")
+            try:
+                os.remove(fullname)
+            except:
+                print("No file created!")
+                return False
+            return False
 
 def doLogin(email, password):
     browser.get(
@@ -122,10 +149,11 @@ def grabLesson(lessonlink, path):
     # time.sleep(2)
     try:
         # videolink = browser.find_element("tag name",
-            # "video").get_attribute("currentSrc")
+        # "video").get_attribute("currentSrc")
+        # https://github.com/wkeeling/selenium-wire#accessing-requests
         videolink = browser.wait_for_request('m3u8').url
         # videotitle = browser.find_element("tag name",
-            # "h1").get_attribute("innerText").replace(":", "").replace(" ", "_").replace("/", "")
+        # "h1").get_attribute("innerText").replace(":", "").replace(" ", "_").replace("/", "")
         videotitle = browser.find_element(By.CLASS_NAME, "workoutTitle").text
     except:
         print("Page loading failed! Retrying...")
@@ -138,6 +166,16 @@ def makeDir(dirr):
         os.makedirs(dirr)
     except OSError:
         pass
+
+# paths = ['\\desk-therapy\\']
+
+# # drop beginner strength for now, need to handle classes w/ repeated videos
+# paths.remove('\\beginner-true-strength\\')
+# paths.remove('\\true-strength-fundamentals\\')
+# paths.remove('\\quest-for-the-press\\')
+# lines = ['https://www.alomoves.com/series/desk-therapy/workouts']
+REDOWNLOAD = False
+## need to set basepath to out of C drive
 
 
 def main():
@@ -162,6 +200,7 @@ def main():
             while counter < len(lessonlinks):
                 print(
                     f"Grabbed {counter}/{len(lessonlinks)-1} links ({skipped} skipped)")
+                del browser.requests
                 result = grabLesson(lessonlinks[counter], paths[i])
                 if not result:
                     failures += 1
@@ -179,7 +218,8 @@ def main():
             failures = 0
             while counter < len(dlcontent):
                 print(f"{counter}/{len(dlcontent)-1} files downloaded")
-                if not downloadmp4(dlcontent[counter][0], dlcontent[counter][1], paths[i], counter, i):
+                # if not downloadmp4(dlcontent[counter][0], dlcontent[counter][1], paths[i], counter, i):
+                if not downloadm3u8_as_mkv(dlcontent[counter][0], dlcontent[counter][1], paths[i], counter, i):
                     failures += 1
                     time.sleep(15)
                     if failures == 3:
@@ -198,5 +238,6 @@ main()
 
 ### to do 
 ### don't download all videos for each class if it is repeated 
-### get list of m3u8 playlists
-### convert either by some python binding to ffmpeg or just use process to call it
+### double check how we're getting m3u8 links, looked to be dpulicated cause 
+### wasn't clearing buffer, review to make sure i'm getting the right link for right 
+### class each time
